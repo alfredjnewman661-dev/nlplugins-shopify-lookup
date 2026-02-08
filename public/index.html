@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shopify Customer Lookup</title>
+  <style>
+    :root {
+      --primary: #5c6ac4;
+      --primary-light: #6371c7;
+      --success: #50b83c;
+      --warning: #f49342;
+      --error: #de3618;
+      --text: #212b36;
+      --text-muted: #637381;
+      --border: #dfe3e8;
+      --bg: #f4f6f8;
+      --card-bg: #ffffff;
+    }
+    
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 13px;
+      line-height: 1.5;
+      color: var(--text);
+      background: var(--bg);
+      padding: 12px;
+    }
+    
+    .loading {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 20px;
+      color: var(--text-muted);
+    }
+    
+    .spinner {
+      width: 24px;
+      height: 24px;
+      border: 2px solid var(--border);
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-bottom: 12px;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    .error-state, .empty-state {
+      text-align: center;
+      padding: 30px 20px;
+      color: var(--text-muted);
+    }
+    
+    .error-state .icon, .empty-state .icon {
+      font-size: 32px;
+      margin-bottom: 8px;
+    }
+    
+    .customer-card {
+      background: var(--card-bg);
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      margin-bottom: 12px;
+      overflow: hidden;
+    }
+    
+    .customer-header {
+      padding: 14px;
+      border-bottom: 1px solid var(--border);
+    }
+    
+    .customer-name {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+    
+    .customer-email {
+      color: var(--text-muted);
+      font-size: 12px;
+    }
+    
+    .stats-row {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+    }
+    
+    .stat {
+      flex: 1;
+      padding: 12px;
+      text-align: center;
+      border-right: 1px solid var(--border);
+    }
+    
+    .stat:last-child {
+      border-right: none;
+    }
+    
+    .stat-value {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--primary);
+    }
+    
+    .stat-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+    }
+    
+    .action-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      padding: 10px;
+      background: var(--primary);
+      color: white;
+      text-decoration: none;
+      font-weight: 500;
+      font-size: 13px;
+      transition: background 0.2s;
+    }
+    
+    .action-btn:hover {
+      background: var(--primary-light);
+    }
+    
+    .action-btn svg {
+      margin-right: 6px;
+    }
+    
+    .section-title {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin: 16px 0 8px;
+    }
+    
+    .order-card {
+      background: var(--card-bg);
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      margin-bottom: 8px;
+      padding: 12px;
+    }
+    
+    .order-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 8px;
+    }
+    
+    .order-number {
+      font-weight: 600;
+      color: var(--primary);
+    }
+    
+    .order-total {
+      font-weight: 600;
+    }
+    
+    .order-date {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+    
+    .status-badges {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-bottom: 8px;
+    }
+    
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 11px;
+      font-weight: 500;
+    }
+    
+    .badge-paid { background: #e3f1df; color: #108043; }
+    .badge-pending { background: #fff5ea; color: #9c6f19; }
+    .badge-refunded { background: #fbeae5; color: #bf0711; }
+    .badge-fulfilled { background: #e3f1df; color: #108043; }
+    .badge-unfulfilled { background: #fff5ea; color: #9c6f19; }
+    .badge-partial { background: #e0f5f5; color: #00848e; }
+    
+    .tracking-info {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 6px;
+    }
+    
+    .tracking-info a {
+      color: var(--primary);
+    }
+    
+    .order-actions {
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid var(--border);
+    }
+    
+    .order-link {
+      font-size: 12px;
+      color: var(--primary);
+      text-decoration: none;
+    }
+    
+    .order-link:hover {
+      text-decoration: underline;
+    }
+    
+    .search-box {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    
+    .search-box input {
+      flex: 1;
+      padding: 8px 12px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 13px;
+    }
+    
+    .search-box button {
+      padding: 8px 16px;
+      background: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div class="loading">
+      <div class="spinner"></div>
+      <div>Loading customer data...</div>
+    </div>
+  </div>
+
+  <script>
+    const app = document.getElementById('app');
+    
+    // Parse contact info from Chatwoot dashboard app context
+    function getContactFromChatwoot() {
+      // Chatwoot passes contact info via URL params or postMessage
+      const params = new URLSearchParams(window.location.search);
+      
+      // Check URL params first
+      let email = params.get('email');
+      let contactId = params.get('contact_id');
+      let conversationId = params.get('conversation_id');
+      
+      return { email, contactId, conversationId };
+    }
+    
+    // Listen for Chatwoot postMessage events
+    window.addEventListener('message', function(event) {
+      // Chatwoot sends contact data via postMessage
+      if (event.data && event.data.contact) {
+        const contact = event.data.contact;
+        if (contact.email) {
+          loadCustomer(contact.email);
+        }
+      }
+    });
+    
+    // Format currency
+    function formatCurrency(amount, currency = 'USD') {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: currency
+      }).format(amount);
+    }
+    
+    // Format date
+    function formatDate(dateStr) {
+      const date = new Date(dateStr);
+      return date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+      });
+    }
+    
+    // Get badge class for status
+    function getStatusBadge(status, type) {
+      const statusLower = (status || '').toLowerCase();
+      
+      if (type === 'financial') {
+        if (statusLower.includes('paid')) return 'badge-paid';
+        if (statusLower.includes('refund')) return 'badge-refunded';
+        return 'badge-pending';
+      }
+      
+      if (type === 'fulfillment') {
+        if (statusLower.includes('fulfilled') && !statusLower.includes('unfulfilled')) return 'badge-fulfilled';
+        if (statusLower.includes('partial')) return 'badge-partial';
+        return 'badge-unfulfilled';
+      }
+      
+      return '';
+    }
+    
+    // Render customer data
+    function renderCustomer(data) {
+      if (!data.found) {
+        app.innerHTML = `
+          <div class="empty-state">
+            <div class="icon">🔍</div>
+            <div>No Shopify customer found</div>
+            <small>This email is not associated with any Shopify account</small>
+          </div>
+        `;
+        return;
+      }
+      
+      const ordersHtml = data.orders.map(order => {
+        const trackingHtml = order.tracking.length > 0 
+          ? `<div class="tracking-info">
+              📦 ${order.tracking.map(t => 
+                t.url ? `<a href="${t.url}" target="_blank">${t.number}</a>` : t.number
+              ).join(', ')}
+            </div>`
+          : '';
+        
+        return `
+          <div class="order-card">
+            <div class="order-header">
+              <div>
+                <div class="order-number">${order.name}</div>
+                <div class="order-date">${formatDate(order.createdAt)}</div>
+              </div>
+              <div class="order-total">${formatCurrency(order.total.amount, order.total.currencyCode)}</div>
+            </div>
+            <div class="status-badges">
+              <span class="badge ${getStatusBadge(order.financialStatus, 'financial')}">
+                ${order.financialStatus || 'Pending'}
+              </span>
+              <span class="badge ${getStatusBadge(order.fulfillmentStatus, 'fulfillment')}">
+                ${order.fulfillmentStatus || 'Unfulfilled'}
+              </span>
+            </div>
+            ${trackingHtml}
+            <div class="order-actions">
+              <a href="${order.adminUrl}" target="_blank" class="order-link">View in Shopify →</a>
+            </div>
+          </div>
+        `;
+      }).join('');
+      
+      app.innerHTML = `
+        <div class="customer-card">
+          <div class="customer-header">
+            <div class="customer-name">${data.firstName || ''} ${data.lastName || ''}</div>
+            <div class="customer-email">${data.email}</div>
+          </div>
+          <div class="stats-row">
+            <div class="stat">
+              <div class="stat-value">${data.ordersCount || 0}</div>
+              <div class="stat-label">Orders</div>
+            </div>
+            <div class="stat">
+              <div class="stat-value">${formatCurrency(parseFloat(data.totalSpent) || 0)}</div>
+              <div class="stat-label">Lifetime</div>
+            </div>
+          </div>
+          <a href="${data.adminUrl}" target="_blank" class="action-btn">
+            <svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z"/>
+              <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z"/>
+            </svg>
+            View in Shopify
+          </a>
+        </div>
+        
+        ${data.orders.length > 0 ? `
+          <div class="section-title">Recent Orders</div>
+          ${ordersHtml}
+        ` : `
+          <div class="empty-state">
+            <small>No orders yet</small>
+          </div>
+        `}
+      `;
+    }
+    
+    // Render error state
+    function renderError(message) {
+      app.innerHTML = `
+        <div class="error-state">
+          <div class="icon">⚠️</div>
+          <div>Error loading data</div>
+          <small>${message}</small>
+        </div>
+      `;
+    }
+    
+    // Render manual search
+    function renderSearch() {
+      app.innerHTML = `
+        <div class="search-box">
+          <input type="email" id="email-input" placeholder="Enter customer email..." />
+          <button onclick="searchEmail()">Search</button>
+        </div>
+        <div class="empty-state">
+          <div class="icon">📧</div>
+          <div>Enter an email to lookup</div>
+          <small>Customer info from Chatwoot not available</small>
+        </div>
+      `;
+    }
+    
+    // Search by email
+    window.searchEmail = function() {
+      const input = document.getElementById('email-input');
+      if (input && input.value) {
+        loadCustomer(input.value);
+      }
+    };
+    
+    // Load customer data
+    async function loadCustomer(email) {
+      if (!email) {
+        renderSearch();
+        return;
+      }
+      
+      app.innerHTML = `
+        <div class="loading">
+          <div class="spinner"></div>
+          <div>Looking up ${email}...</div>
+        </div>
+      `;
+      
+      try {
+        const response = await fetch(`/api/customer?email=${encodeURIComponent(email)}`);
+        const data = await response.json();
+        
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to fetch customer');
+        }
+        
+        renderCustomer(data);
+      } catch (error) {
+        console.error('Error:', error);
+        renderError(error.message);
+      }
+    }
+    
+    // Initialize
+    document.addEventListener('DOMContentLoaded', function() {
+      const { email } = getContactFromChatwoot();
+      
+      if (email) {
+        loadCustomer(email);
+      } else {
+        // Show search interface and wait for Chatwoot postMessage
+        renderSearch();
+        
+        // For demo/testing, try to get email from localStorage
+        const testEmail = localStorage.getItem('test_email');
+        if (testEmail) {
+          loadCustomer(testEmail);
+        }
+      }
+    });
+  </script>
+</body>
+</html>
