@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const { validateLicense } = require("./license");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -15,6 +16,80 @@ app.use(express.static('public'));
 const SHOPIFY_STORE = process.env.SHOPIFY_STORE; // e.g., 'mystore.myshopify.com'
 const SHOPIFY_ACCESS_TOKEN = process.env.SHOPIFY_ACCESS_TOKEN;
 const SHOPIFY_API_VERSION = process.env.SHOPIFY_API_VERSION || '2024-01';
+const MOCK_MODE = process.env.MOCK_MODE === 'true';
+
+// Mock data for testing
+const MOCK_CUSTOMERS = {
+  'test@example.com': {
+    found: true,
+    id: '1234567890',
+    graphqlId: 'gid://shopify/Customer/1234567890',
+    firstName: 'John',
+    lastName: 'Doe',
+    email: 'test@example.com',
+    phone: '+1 555-123-4567',
+    createdAt: '2023-06-15T10:30:00Z',
+    ordersCount: 3,
+    totalSpent: '549.97',
+    adminUrl: `https://${SHOPIFY_STORE}/admin/customers/1234567890`,
+    orders: [
+      {
+        id: '9876543210',
+        name: '#1001',
+        createdAt: '2024-02-01T14:22:00Z',
+        financialStatus: 'PAID',
+        fulfillmentStatus: 'FULFILLED',
+        total: { amount: '199.99', currencyCode: 'USD' },
+        adminUrl: `https://${SHOPIFY_STORE}/admin/orders/9876543210`,
+        tracking: [{ number: '1Z999AA10123456784', url: 'https://www.ups.com/track?tracknum=1Z999AA10123456784', status: 'DELIVERED' }]
+      },
+      {
+        id: '9876543211',
+        name: '#1002',
+        createdAt: '2024-01-15T09:45:00Z',
+        financialStatus: 'PAID',
+        fulfillmentStatus: 'IN_TRANSIT',
+        total: { amount: '149.99', currencyCode: 'USD' },
+        adminUrl: `https://${SHOPIFY_STORE}/admin/orders/9876543211`,
+        tracking: [{ number: '9261290100130535442978', url: 'https://tools.usps.com/go/TrackConfirmAction?tLabels=9261290100130535442978', status: 'IN_TRANSIT' }]
+      },
+      {
+        id: '9876543212',
+        name: '#1003',
+        createdAt: '2023-12-20T16:30:00Z',
+        financialStatus: 'PAID',
+        fulfillmentStatus: 'FULFILLED',
+        total: { amount: '199.99', currencyCode: 'USD' },
+        adminUrl: `https://${SHOPIFY_STORE}/admin/orders/9876543212`,
+        tracking: []
+      }
+    ]
+  },
+  'jane@example.com': {
+    found: true,
+    id: '1234567891',
+    firstName: 'Jane',
+    lastName: 'Smith',
+    email: 'jane@example.com',
+    phone: '+1 555-987-6543',
+    createdAt: '2024-01-10T08:00:00Z',
+    ordersCount: 1,
+    totalSpent: '79.99',
+    adminUrl: `https://${SHOPIFY_STORE}/admin/customers/1234567891`,
+    orders: [
+      {
+        id: '9876543220',
+        name: '#1010',
+        createdAt: '2024-02-05T11:00:00Z',
+        financialStatus: 'PENDING',
+        fulfillmentStatus: 'UNFULFILLED',
+        total: { amount: '79.99', currencyCode: 'USD' },
+        adminUrl: `https://${SHOPIFY_STORE}/admin/orders/9876543220`,
+        tracking: []
+      }
+    ]
+  }
+};
 
 // Helper: Make Shopify API request
 async function shopifyRequest(endpoint, method = 'GET', body = null) {
@@ -70,6 +145,16 @@ app.get('/api/customer', async (req, res) => {
     
     if (!email) {
       return res.status(400).json({ error: 'Email is required' });
+    }
+    
+    // Mock mode - return test data
+    if (MOCK_MODE) {
+      console.log(`[MOCK] Looking up customer: ${email}`);
+      const mockCustomer = MOCK_CUSTOMERS[email.toLowerCase()];
+      if (mockCustomer) {
+        return res.json(mockCustomer);
+      }
+      return res.json({ found: false, message: 'Customer not found in Shopify (mock mode)', mockMode: true });
     }
     
     // GraphQL query for customer + orders
@@ -240,6 +325,7 @@ app.get('/api/health', (req, res) => {
   res.json({ 
     status: 'ok', 
     shopifyStore: SHOPIFY_STORE ? 'configured' : 'missing',
+    mockMode: MOCK_MODE,
     timestamp: new Date().toISOString()
   });
 });
@@ -249,7 +335,11 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-app.listen(PORT, () => {
+async function start() {
+  await validateLicense(process.env.NLPLUGINS_LICENSE_KEY);
+  app.listen(PORT, () => {
   console.log(`🛍️  Shopify Lookup Dashboard running on port ${PORT}`);
   console.log(`   Store: ${SHOPIFY_STORE || 'NOT CONFIGURED'}`);
 });
+}
+start().catch(err => { console.error(err); process.exit(1); });
