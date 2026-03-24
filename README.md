@@ -1,3 +1,9 @@
+> **💰 [$24 — Buy Now](https://nlplugins.lemonsqueezy.com/checkout/buy/14074601-a8b0-4966-8a42-3cd38a954d14)** | **[Learn More](https://nlplugins.com/plugins/shopify-order-lookup.html)** | **[All NL Plugins](https://nlplugins.com)**
+> 
+> One-time purchase · Source code included · 14-day money-back guarantee · [Terms](https://nlplugins.com/terms.html)
+
+---
+
 # Chatwoot Shopify Order Lookup Dashboard
 
 A Chatwoot Dashboard App that displays Shopify customer info and order history in the conversation sidebar.
